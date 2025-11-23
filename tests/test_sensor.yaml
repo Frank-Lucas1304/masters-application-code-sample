@@ -14,9 +14,10 @@ communication_settings:
   port: 5020
   host: 127.0.0.0
 
+
 daq:
   modbus_addr: 98
-  storage_path: 'data'
+  storage_path: 'output'
   daq_working_dir: 'output'
   process:  # uncomment and modify this section if needed, the values below are used as defaults.
     sampling_interval: 1
@@ -25,7 +26,7 @@ daq:
   groups:
     target: ['corr_value']
     diagnostics: ['corr_value','raw_value','internal_temperature']
-    daily_diagnostics: ['sensor_name','company_name', 'serial_number','firmware_version','hardware_version','manufacture_date', 'lin_coefficient_k', 'calibration_date_k','calibration_value_k']
+    daily_diagnostics: ['serial_number','firmware_version','manufacture_date','calibration_date_k','calibration_value_k']
 
 registers:
   special_conversion:
@@ -33,6 +34,7 @@ registers:
     # Each field requires:
       # 'address': starting address
       # 'format' : type of information that is stored. Plays a role in the amount of registers that are read
+      # 'count'  : #TODO
       # 'repeat' : number of consecutive fields of the same type in the registers (optional)
       # 'gap'    : the amount registers that are between a repeated data field sequence (i.e. data - gap - data - gap ...), (optional)
 
@@ -48,49 +50,26 @@ registers:
       address: 4
       format: 'F32'
       header: "Internal Temperature [°C]"
-    company_name:
-      address: 6
-      count: 2
-      format: "STR"
-      header: "Company Name"
     firmware_version:
-      address: 7
+      address: 6
       format: "U16"
       header: "Firmware Version"
-    hardware_version:
-      address: 8
-      format: "U16"
-      header: "Hardware Version"
-    register_config:
-      address: 9
-      format: 'U16'
-      header: "Register Map Setting"
     manufacture_date:
-      address: 10
+      address: 9
       format: "U32"
       header: "Manufacture Date"
     serial_number:
-      address: 12
+      address: 11
       format: "U32"
       header: "Serial Number"
-    sensor_name:
-      address: 14
-      count: 8
-      format: "STR"
-      header: "Sensor Name"
-    lin_coefficient_k:
-      address: 22
-      repeat: 4
-      format: 'F32'
-      header: "Linear Coefficient"
     calibration_date_k:
-      address: 30
+      address: 13
       repeat: 2
       gap: 2
       format: "U32"
       header: "Calibration Date"
     calibration_value_k:
-      address: 32
+      address: 15
       repeat: 2
       gap: 2
       format: "F32"

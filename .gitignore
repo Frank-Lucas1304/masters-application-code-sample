@@ -1,0 +1,15 @@
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Python bytecode
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+venv/
+ENV/
+env/
