@@ -5,6 +5,7 @@ Provides continuous data collection with configurable sampling, averaging, and
 diagnostic intervals. Data is automatically written to CSV files organized by
 timestamp.
 """
+from __future__ import annotations
 
 import atexit, signal
 import collections
@@ -27,22 +28,22 @@ OBLIGATORY_CFG_KEYS = ['sensor_name', 'sensor_model', 'communication_settings','
 
 DECIMAL_PLACES:int = 3
 MAX_READ_REGISTER = 20
-CACHE_SIZE_FACTOR = 5 # TODO Evaluate
-WRITING_INTERVAL = timedelta(seconds=60) # TODO CHANGE
-
+CACHE_SIZE_FACTOR = 5
+WRITING_INTERVAL = timedelta(seconds=60)
+daq_working_dir = Path()
 logger = logging.getLogger("daq")
 
 
 class Daq:
     """
-    Data Acquisition system for Modbus-based sensors with multi-threaded operation.
+    Data Acquisition system for Modbus-based sensors with multithreaded operation.
 
-    Manages continuous sensor data collection with configurable sampling, averaging,
+    Manages data collection with configurable sampling, averaging,
     and diagnostic intervals. Uses two worker threads for concurrent operation:
     - Foreground: Reads sensor at sampling_interval
     - Background: Computes averages and writes data to CSV files
 
-    All data is written to timestamped CSV files organized by month/day/hour.
+    All data is written to timestamped CSV files organized by year/month/day/hour.
     Graceful shutdown ensures no data loss on interruption.
     """
 
@@ -54,7 +55,7 @@ class Daq:
         Initializes Data Acquisition Instance for Modbus sensor
 
         :param modbus_client_obj: modbus client object
-        :param storage_path: path to which data series will be stored; folders for month, day, hour will be created
+        :param storage_path: path to which data series will be stored; folders for year, month, day and hour will be created
         :param fields_cfg: modbus fields definition
         :param field_groups: defines list of fields in each group: target, diagnostics and daily_diagnostics
         :param sampling_interval: datetime timedelta -- temporal window between raw data series
@@ -65,6 +66,8 @@ class Daq:
 
         # MODBUS COMMUNICATION PROTOCOL
         self.client = modbus_client_obj
+        self.port = modbus_client_obj.comm_params.port
+        self.host = modbus_client_obj.comm_params.host
 
         # DAQ SETTINGS
         self.storage_path = storage_path
@@ -86,7 +89,7 @@ class Daq:
         self.daily_diagnostic_fields = self.fields.define_group(field_groups['daily_diagnostics'],decimal_places=DECIMAL_PLACES)
 
         # TIME REFERENCE
-        # Assume program is restarted every day no need to update value
+        # Assume program is restarted every day. No need to update value
         self.timezone_info = timezone_info
         self.midnight = datetime.combine(date.today(), datetime.min.time()).astimezone(timezone_info)
 
@@ -107,7 +110,7 @@ class Daq:
     def validating_params(self) -> bool:
         """
         Validates that the DAQ time parameters meet program requirements.
-        These requirements were implemented to simply its design.
+        These requirements were implemented to simplify its design.
 
         Requirements:
         - Averaging interval must be >= sampling interval
@@ -118,7 +121,6 @@ class Daq:
         :return: True if all parameters are valid, False otherwise.
         """
         size_constraint = (self.averaging_interval.seconds >= self.sampling_interval.seconds and self.diagnostic_interval.seconds >= self.sampling_interval.seconds)
-        # Necessary constraint due to program design
         factor_constraint = self.averaging_interval.seconds % self.sampling_interval.seconds == 0 and self.diagnostic_interval.seconds % self.averaging_interval.seconds == 0
 
         if not size_constraint:
@@ -131,7 +133,7 @@ class Daq:
         """
         Creates a ring buffer for storing raw measurement data.
 
-        The buffer size is calculated based on the writing interval and sampling
+        The buffer size is calculated based on the writing and sampling
         interval to ensure sufficient capacity between disk writes.
 
         :return: Ring buffer with max size
@@ -161,12 +163,10 @@ class Daq:
 
     def get_daily_diagnostics(self) -> list[ N | str | list[list[str | float]]]:
         """
-        Reads daily diagnostic registers and reshapes specific fields (calibration history
-        and linear coefficients) into a CSV-friendly structure with nested lists.
+        Retrieves and formats daily diagnostic data for CSV output.
 
-        Notes:
-            - Current CSV-structure is specifically for model X sensors.
-            - Adjustment might be necessary for future versions of program if different models are added to project
+        Reshapes calibration history and linear coefficients into nested lists
+        for the Model X sensor CSV format.
 
         :return: CSV-formatted list where each element represents a field:
                     - Scalar values (int, float, str) for simple fields
@@ -200,8 +200,7 @@ class Daq:
                 csv_formated_data.append(calibration_history)
 
             elif field_name_to_idx['calibration_value_k'] == idx:
-                # Skipped since calibration values are collected with the calibration dates in the elif calibration_date_k bloc.
-                # Doing so ensure that the formatting for this csv file is independent of the order in which fields appear in the converted_data list.
+                # Skipped since calibration values are collected with the calibration dates in the elif bloc above.
                 continue
             else:
                 csv_formated_data.append(converted_data[idx])
@@ -210,9 +209,9 @@ class Daq:
 
     def get_measurement_and_diagnostic_data(self) -> tuple[list[int],list[int]]:
         """
-        Reads raw measurement and diagnostic data from sensor.
+        Reads raw register measurement and diagnostic data.
 
-        returns: A tuple containing:
+        :return: A tuple containing:
                 - measurements: List of 16-bit register values for sensor readings
                 - diagnostics: List of 16-bit register values for diagnostic data
         """
@@ -225,7 +224,7 @@ class Daq:
 
     def get_and_cache_measurement(self, timestamp:datetime) -> None:
         """
-        Reads raw measurement and adds it to cache.
+        Reads measurement and adds it to cache.
 
         :param timestamp: time at which the values were read from sensor.
         """
@@ -238,7 +237,7 @@ class Daq:
 
     def get_and_cache_measurement_and_diagnostic(self, timestamp:datetime) -> None:
         """
-        Reads raw measurement and diagnostic data. Then appends the values to their respective cache.
+        Reads raw register measurement and diagnostic data, then caches both.
 
         :param timestamp: time at which the values were acquired.
         """
@@ -275,9 +274,8 @@ class Daq:
         to averaging interval boundaries. Handles missing data by adjusting for
         actual time gaps between samples.
 
-        :param cleanup: if True, processes all remaining cached data (used during shutdown)
+        :param cleanup: If True, processes all remaining cached data (default: False) - used during shutdown
         """
-        # TODO - CHECK HOW IT RESPONDS TO FLOATS NEAR BOUNDARIES
         if len(self.raw_data_cache) <= 1 and not cleanup:  # check to avoid any data racing
             logger.debug('Calculating average measurement is not possible at the moment')
             return
@@ -286,13 +284,14 @@ class Daq:
         avg = 0
         ts, _ = self.raw_data_cache[0]
         prev_ts = ts
-        start_ts = ts  # For debugging purposes
-        end_ts = ts  # For debugging purposes
+        start_ts = ts
+        end_ts = ts
         wait_time, _ = self.calculate_interval_timing(self.averaging_interval, ts)
         seconds_remaining_in_averaging_interval = round(wait_time, 0)
         first_loop = True
-        # ---- Handles Starting --- #
-        if seconds_remaining_in_averaging_interval == self.averaging_interval.seconds:  # this means that the starting data point is at 0
+
+        # ---- Handles Starting With End Value of Previous Averaging Window--- #
+        if seconds_remaining_in_averaging_interval == self.averaging_interval.seconds:
             seconds_remaining_in_averaging_interval = 0
 
         avg_measurement_ts = ts + timedelta(
@@ -339,8 +338,8 @@ class Daq:
         :param data: data to be stored in csv file.
         :param filename_format: time based formating string
         :param headers: aliases for the column names.
-        :param clear: if True, frees space. (default is True) #TODO Clarify
-        :param daily_diagnostics: if True, formats data into specific template for daily diagnostics. (default is False)
+        :param clear: If True, clears the data list after writing (default: True)
+        :param daily_diagnostics: If True, uses daily diagnostic formatting (default: False)
         """
 
         target_folder = f'{self.storage_path}/{ts:%Y}{ts:%m}/{ts:%d}/{ts:%H}/'
@@ -374,18 +373,19 @@ class Daq:
                 logger.info(
                     f"data written in {ts.strftime(filename_format)}.csv before {datetime.now().astimezone(self.timezone_info)}")
 
-            if clear:  # Clear cache if needed
+            if clear:
                 data.clear()
 
     def read_continuously(self) -> None:
         """
-        Reads continuously raw data from sensor and appends it to the respective cache.
+        Continuously reads data from sensor and appends it to cache.
 
-        Notes
-        -----
-        The validation constraint requiring diagnostic_interval to be an exact multiple of
-        sampling_interval ensures diagnostics only trigger at times when samples are actually
-        taken (i.e., at their LCM, which equals diagnostic_interval when this constraint holds).
+        Collects diagnostic data when the sample times align with diagnostic_interval.
+        Runs until stop_event is set or an error occurs.
+
+        Notes:
+            The interval validation ensures diagnostics align with sample times,
+            preventing partial data issues.
         """
         while not self.stop_event.is_set():
             wait_time, time_since_midnight = self.calculate_interval_timing(self.sampling_interval)
@@ -393,7 +393,7 @@ class Daq:
                 break
             try:
                 ts = datetime.now().astimezone(self.timezone_info)
-                # Calculate target time we intended to hit (before any execution delay)
+                # Calculate target time we intended to hit (avoids having to handle execution delay)
                 target_time_seconds = int(time_since_midnight.total_seconds() + wait_time)
                 is_diagnostics = (target_time_seconds % self.diagnostic_interval.seconds) == 0
                 if is_diagnostics:
@@ -408,20 +408,25 @@ class Daq:
 
     def background(self) -> None:
         """
-        Calculates average signal and writes it and diagnostic data to csv files.
+        Background thread that computes averages and writes data to disk.
 
+        Wakes at the minimum of averaging_interval or WRITING_INTERVAL to:
+        - Calculate rolling averages when averaging_interval boundary is reached
+        - Write cached data to CSV when WRITING_INTERVAL boundary is reached
+
+        Runs until stop_event is set.
         """
 
         time.sleep(
-            self.averaging_interval.seconds)  # Additional wait is to ensure that the measurement queue is always populated before computing the average
+            self.averaging_interval.seconds)  # To ensure raw cache is always populated before computing the average
         while not self.stop_event.is_set():
             try:
                 ts = datetime.now().astimezone(self.timezone_info)
                 write_wait_time, write_tsm = self.calculate_interval_timing(WRITING_INTERVAL,ts)
                 calc_wait_time, calc_tsm = self.calculate_interval_timing(self.averaging_interval,ts)
                 wait_time = min([write_wait_time, calc_wait_time])
-                if self.stop_event.wait(timeout=wait_time): # also could exit early if ever flag is raised
-                    # stop_event was set! Exit immediately
+
+                if self.stop_event.wait(timeout=wait_time): # Stop events allows to exit early if it sets
                     break
 
                 target_time_seconds = int(calc_tsm.total_seconds() + wait_time)
@@ -456,9 +461,12 @@ class Daq:
 
     def start_acquisition(self) -> None:
         """
-        Starts the acquisition process.
+        Starts the data acquisition process.
 
+        Validates configuration, connects to sensor, writes initial daily diagnostics,
+        then launches foreground and background threads. Blocks until shutdown.
         """
+        os.chdir(daq_working_dir)
         print("Initializing acquisition process...")
 
         if not self.__record_status:
@@ -466,15 +474,13 @@ class Daq:
                 'status - conditions to record image not met. Change frequency of sampling, averaging and/or diagnostics.')
             return
 
-        if not self.client.connect():  # Checks if a device is connected to serial port
+        if not self.client.connect():
             logger.info(
                 'status - conditions to record data not met. Unable to establish connection with pyranometer.')
             return
 
         self.write_daily_diagnostics()
 
-        # self.midnight = datetime.combine(date.today(), datetime.min.time()).astimezone(
-        #     self.timezone_info)  # Since program is restarted every day no need to update value
         wait_time, _ = self.calculate_interval_timing(self.averaging_interval)
         logger.info(f"Daq program will begin in {round(wait_time,3)} seconds")
 
@@ -498,7 +504,15 @@ class Daq:
 
 
     def cleanup(self, sig:int | None =None, frame:FrameType | None =None) -> None:
-        # assumed this method will only be executed before the end of the day (might be issue or else with file in which data is written too
+        """
+        Gracefully shuts down acquisition and writes remaining data.
+
+        Processes cached measurements, writes final averages to disk, and closes
+        the Modbus connection. Called automatically via signal handlers or atexit.
+
+        :param sig: signal number if triggered by signal handler (optional)
+        :param frame: stack frame (unused, required by signal handler signature)
+        """
 
         if self.cleaned_up:
             return
@@ -555,9 +569,16 @@ class Daq:
         return wait_time, time_since_midnight
 
     @staticmethod
-    def load(yaml_file):
+    def load(yaml_file:str) -> 'Daq':
+        global daq_working_dir
+        """
+        Loads DAQ configuration from YAML file and initializes instance.
+
+        :param yaml_file: configuration file to load
+
+        :return: Daq instance
+        """
         storage_path = Path()
-        daq_working_dir = Path()
         config=dict()
         with open(yaml_file, "r") as config_file:
             config = yaml.load(config_file, Loader=yaml.FullLoader)
@@ -595,11 +616,15 @@ class Daq:
             if 'diagnostic_interval' in daq_cfg.keys() and daq_cfg['diagnostic_interval'] is not None:
                 daq_cfg['diagnostic_interval'] = timedelta(seconds=daq_cfg['diagnostic_interval'])
 
+        log_path=f"{daq_working_dir}/logs"
+        data_path=f"{daq_working_dir}/{storage_path}"
+
         if not os.path.isdir(daq_working_dir):
             os.makedirs(daq_working_dir)
-        os.chdir(daq_working_dir)
-        if not os.path.isdir("logs"):
-            os.makedirs("logs")
+        if not os.path.isdir(log_path):
+            os.makedirs(log_path)
+        if not os.path.isdir(data_path):
+            os.makedirs(data_path)
 
         timezone_info = Daq.timezone_adjustment(config.get('timezone'))
         if timezone_info is None:
@@ -607,13 +632,12 @@ class Daq:
         else:
             timezone_info = pytz.timezone(timezone_info)
 
-        # return  sensor_cfg, fields_cfg, comm_cfg, daq_cfg , timezone_info
         timestamp_logfile = datetime.now(timezone_info)
 
-        logging.basicConfig(filename=f'logs/daq_{timestamp_logfile:%Y%m%d_%H%M%S}.log',
+        logging.basicConfig(filename=f'{log_path}/daq_{timestamp_logfile:%Y%m%d_%H%M%S}.log',
                             level=logging.DEBUG, format='%(levelname)s - %(asctime)s: %(message)s', datefmt='%H:%M:%S')
 
-        # STDOUT LOGGER
+        # STDOUT LOGGER - (for user-friendly purpose. Would be removed if program was implemented on physical machine)
         root = logger
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.INFO)

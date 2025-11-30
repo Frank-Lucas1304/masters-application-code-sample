@@ -21,7 +21,7 @@ async def update_registers(holding_registers:ModbusSequentialDataBlock) -> None:
         await asyncio.sleep(0.110)
 
 
-async def modbus_server() -> None:
+async def modbus_server(sensor_host:str,sensor_port:int) -> None:
     """
     Initializes modbus sever and updates its registers
     """
@@ -32,7 +32,7 @@ async def modbus_server() -> None:
         config = yaml.load(config_file, Loader=yaml.FullLoader)
     modbus_fields = config.get("registers")
     fields = DataSchema(modbus_fields['data_fields'])
-    # should be data and
+
     field_values = [0,0,0,"X   \\",7,9,0,20240201,25348340,"Arbitrary_Sensor",[0,1,0,0],[20240201,0],[10,20]]
 
     registers = fields.define_group(list(fields.map.keys()))
@@ -54,20 +54,20 @@ async def modbus_server() -> None:
     # Start the Modbus TCP server
     server = ModbusTcpServer(
         context=server_context,
-        address=("0.0.0.0", 5020),  # Listen on all network interfaces
+        address=(sensor_host, sensor_port),
     )
 
     # Start the background task to update registers periodically
     asyncio.create_task(update_registers(holding_registers))
-    print("Connecting Virtual Sensor: Starting Modbus TCP Server on port 5020...")
+    print(f"Connecting Virtual Sensor: Starting Modbus TCP Server on port {sensor_port}...")
     await server.serve_forever()  # This will block until the server is stopped
 
-def sensor():
+def sensor(sensor_host:str,sensor_port:int) -> None:
     """
     Runs sensor simulation
     """
     try:
-        asyncio.run(modbus_server())  # Start the server in a managed event loop
+        asyncio.run(modbus_server(sensor_host,sensor_port))  # Start the server in a managed event loop
     except Exception as e:
         print(f"Error running server: {e}")
     except KeyboardInterrupt:

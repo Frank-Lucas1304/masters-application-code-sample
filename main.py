@@ -7,10 +7,13 @@ import threading
 if __name__ == "__main__":
     sensor_thread = None
     try:
-        sensor_thread = threading.Thread(target=sim.sensor, daemon=True) # simulating sensor
+        daq = Daq.load("sensors_cfg/sensor.yaml")
+        port = daq.port
+        host = daq.host
+
+        sensor_thread = threading.Thread(target=sim.sensor, args=[host,port], daemon=True) # simulating sensor
         sensor_thread.start()
         time.sleep(5) # Wait time to ensure sensor is completely set up before beginning daq
-        daq = Daq.load("sensors_cfg/sensor.yaml")
         daq.start_acquisition() # starting daq
 
     except KeyboardInterrupt:
