@@ -154,6 +154,7 @@ python main.py
 
 Data will be written to the configured storage path organized by date/time.
 Press Ctrl+C to stop gracefully to stop gracefully.
+
 ---
 
 ## Testing
