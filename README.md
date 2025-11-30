@@ -142,6 +142,8 @@ storage_path/
   - pytest
 
 ## Quick Start
+Select an available TCP port and update the value in the configuration file.
+Ensure the Modbus device (or simulator) is reachable from your system.
 
 ```bash
 # Install dependencies
