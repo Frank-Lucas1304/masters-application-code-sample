@@ -3,9 +3,7 @@ from daq import *
 
 
 class TestDataField:
-    # TODO - TEST HEADER GENERATION
-    # TODO - Test count calculation
-    # TODO - Add messafes after assert
+    # TODO - Add messages after assert
     @pytest.fixture()
     def data_field_obj(self):
         return DataField("raw_value",2,2, ModbusTcpClient.DATATYPE.FLOAT32,"Raw Value [units]")
@@ -48,7 +46,6 @@ class TestDataGroup:
         assert len(group.headers) == 3  # timestamp + 2 fields
 
     def test_convert_all_returns_correct_count(self, sample_schema,timezone_info):
-
         """Test that convert_all returns one value per field."""
         group = sample_schema.define_group(['serial_number', 'firmware_version'],timezone_info)
 

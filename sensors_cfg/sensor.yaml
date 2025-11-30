@@ -1,22 +1,13 @@
 sensor_name: 'Arbitrary_Sensor'
 sensor_model: 'X'
-mounted: !!timestamp '2024-03-11T14:00:00+01:00'
-demounted: !!timestamp '2103-03-03T00:00:00+01:00'
-latitude: 37.094151
-longitude: -2.354781
-altitude: 503.
 timezone: 'GMT+1' # in the regular ISO 8601 convention -- Positive east of Greenwich
-
-dome_heating_status: 0
-register_map_setting: 0
 
 communication_settings:
   port: 5020
   host: 127.0.0.0
 
 daq:
-  modbus_addr: 98
-  storage_path: 'data'
+  storage_path: "data"# relative to working directory
   daq_working_dir: 'output'
   process:  # uncomment and modify this section if needed, the values below are used as defaults.
     sampling_interval: 1
@@ -28,14 +19,13 @@ daq:
     daily_diagnostics: ['sensor_name','company_name', 'serial_number','firmware_version','hardware_version','manufacture_date', 'lin_coefficient_k', 'calibration_date_k','calibration_value_k']
 
 registers:
-  special_conversion:
   data_fields:
     # Each field requires:
       # 'address': starting address
       # 'format' : type of information that is stored. Plays a role in the amount of registers that are read
+      # 'count'  : number of consecutive registers to be used for field (this is for string field)
       # 'repeat' : number of consecutive fields of the same type in the registers (optional)
       # 'gap'    : the amount registers that are between a repeated data field sequence (i.e. data - gap - data - gap ...), (optional)
-
     corr_value:
       address: 0
       format: 'F32'
