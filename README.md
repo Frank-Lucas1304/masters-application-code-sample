@@ -39,7 +39,7 @@ Unit tests are built with pytest.
 
 ### Configurable Settings
 
-- Location and timezone  
+- Timezone  
 - Communication settings  
 - Working directory and storage path  
 - Time intervals (sampling, averaging, diagnostic)  
@@ -143,6 +143,7 @@ storage_path/
   - pytest
 
 ## Quick Start
+
 ```bash
 # Install dependencies
 pip install -r requirements.txt
@@ -150,6 +151,7 @@ pip install -r requirements.txt
 # Start the program
 python main.py
 ```
+
 Data will be written to the configured storage path organized by date/time.
 Press Ctrl+C to stop gracefully to stop gracefully.
 ---
