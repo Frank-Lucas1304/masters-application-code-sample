@@ -93,9 +93,9 @@ Unit tests are built with pytest.
 ├── main.py
 ├── sensor_simulator.py
 ├── utils.py
-├── sensors_cfg
+├── sensors_cfg/
 │       └── sensor.yaml
-└── tests
+└── tests/
       ├── avg_calc_test.py
       ├── data_operations_test.py
       └── test_sensor.yaml
@@ -121,15 +121,14 @@ Configuration file defining sensor parameters, Modbus connection settings, field
 ## Output Structure
 ```
 storage_path/
-  ├── data
-  │     └── 202511                # Year
-  │           └── 11              # Month
-  │                └── 30         # Day
-  │                     ├── 22    # Hour
-  │                     │    ├── 00_diagnostics_2025113     # Diagnostic
-  │                     │    └── 20251130_22.csv            # Averaged Data
-  │                     └── 00_daily_diagnostics.csv        # Daily summary
-  └── logs
+  ├── 202511/                # Year
+  │      └── 11/              # Month
+  │           └── 30/         # Day
+  │                ├── 22/    # Hour
+  │                │    ├── 00_diagnostics_2025113     # Diagnostic
+  │                │    └── 20251130_22.csv            # Averaged Data
+  │                └── 00_daily_diagnostics.csv        # Daily summary
+  └── logs/
         └── sensor_daq_20251130_222513.log
 ```
 
