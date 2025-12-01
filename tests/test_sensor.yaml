@@ -2,15 +2,11 @@ sensor_name: 'Arbitrary_Sensor'
 sensor_model: 'X'
 timezone: 'GMT+1' # in the regular ISO 8601 convention -- Positive east of Greenwich
 
-dome_heating_status: 0
-register_map_setting: 0
-
 communication_settings:
   port: 5020
   host: 127.0.0.0
 
 daq:
-  address: 98
   storage_path: ''
   daq_working_dir: ""
   process:  # uncomment and modify this section if needed, the values below are used as defaults.

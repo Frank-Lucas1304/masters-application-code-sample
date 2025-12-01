@@ -2,7 +2,7 @@ import pytest
 import os
 from pymodbus.client import ModbusTcpClient
 from daq import Daq, DECIMAL_PLACES
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, tzinfo
 from pathlib import Path
 
 
@@ -16,7 +16,7 @@ def daq(mocker):
     mock_instance = mock_client.return_value
     mock_instance.connect.return_value = True
     yaml_file = Path(__file__).parent / "test_sensor.yaml"
-    daq = Daq.load(yaml_file)
+    daq = Daq.load(yaml_file.__str__())
     if os.path.exists("logs"): # keeps directory clean when testing
         os.rmdir("logs")
     # Required conditions for tests to be valid
@@ -26,6 +26,7 @@ def daq(mocker):
 
 
 class TestAverageCalculation:
+
     def test_mock_connection(self,daq):
         assert daq.client.connect()
 
@@ -42,9 +43,9 @@ class TestAverageCalculation:
 
         daq.calculate_and_cache_average_value()
         expected_average = sum(values_within_window) / len(values_within_window)
-        assert daq.average_cache[0][1] == round(expected_average, DECIMAL_PLACES)
+        assert daq.average_cache[0][1] == round(expected_average, DECIMAL_PLACES), "Average was calculated with all values"
 
-    def test_calculate_average_with_float_timestamps(self, daq): #TODO fix
+    def test_calculate_average_with_float_timestamps(self, daq):
         daq.cleaned_up = True
         tz_info = daq.timezone_info
 
@@ -54,19 +55,17 @@ class TestAverageCalculation:
 
         daq.calculate_and_cache_average_value()
         expected_average = sum(values_within_window) / len(values_within_window)
-        assert daq.average_cache[0][1] == round(expected_average,DECIMAL_PLACES)
+        assert daq.average_cache[0][1] == round(expected_average,DECIMAL_PLACES), "All values except value at 6s were used for average calculations"
 
     def test_calculate_average_with_measurements_near_boundaries(self, daq):
         daq.cleaned_up = True
         tz_info = daq.timezone_info
 
         measured_data = [(4.6, 4),(1, 4)]
-        values_within_window = [4]
         daq.raw_data_cache.extend(TestAverageCalculation.create_samples(measured_data, tz_info))
 
         daq.calculate_and_cache_average_value()
-        expected_average = sum(values_within_window) / len(values_within_window)
-        assert daq.average_cache[0][1] == round(expected_average, DECIMAL_PLACES)
+        assert daq.average_cache[0][1] == 4, "Average was calculated from single value near end of (0-5]s window boundary"
 
     def test_calculate_average_when_raw_cache_has_multiple_values_at_same_second(self, daq):
         daq.cleaned_up = True
@@ -79,22 +78,19 @@ class TestAverageCalculation:
         daq.calculate_and_cache_average_value()
 
         expected_average = sum(values_within_window) / len(values_within_window)
-        assert daq.average_cache[0][1] == round(expected_average,DECIMAL_PLACES), "Average was calculated with all values"
+        assert daq.average_cache[0][1] == round(expected_average,DECIMAL_PLACES), "Average was calculated with all first instances of each timestamps"
         # or
     def test_calculate_average_with_five_measurements_in_same_second(self,daq):
         daq.cleaned_up = True
         tz_info = daq.timezone_info
 
         measured_data = [(0, 1), (0, 2), (0, 3), (0, 4), (0, 5)]
-        values_within_window = [1]
         daq.raw_data_cache.extend(TestAverageCalculation.create_samples(measured_data, tz_info))
 
         daq.calculate_and_cache_average_value()
+        assert daq.average_cache[0][1] == 1, "Average was calculated with single value"
 
-        expected_average = sum(values_within_window) / len(values_within_window)
-        assert daq.average_cache[0][1] == round(expected_average,DECIMAL_PLACES), "Average was calculated with all values"
-
-    def test_when_raw_cache_data_begins_at_time_zero(self,daq): # time zero not best description
+    def test_when_raw_cache_data_begins_at_time_zero(self,daq):
         daq.cleaned_up = True
 
         tz_info = daq.timezone_info
@@ -172,11 +168,19 @@ class TestAverageCalculation:
         expected_average = sum(values_within_window) / len(values_within_window)
         daq.calculate_and_cache_average_value()
 
-        assert len(daq.average_cache) == 1
-        assert daq.average_cache[0][1] == expected_average
+        assert len(daq.raw_data_cache) == 2, "Two samples remain in cache since out of (0-5]s window"
+        assert daq.average_cache[0][1] == expected_average, "Average was calculated with values only within the (0-5]s window"
 
     @staticmethod
-    def create_samples(shorthand_data,tz_info):
+    def create_samples(shorthand_data:list[tuple[float,int]],tz_info:tzinfo) -> list[list[datetime|list[int]]]:
+        """
+        Generates modbus raw data from test data.
+
+        :param shorthand_data: list of paired timestamp and measurement values
+        :param tz_info: time zone info
+
+        :return: list of raw 16-bit Modbus register data at different timestamps
+        """
         data =[]
         for sec, val in shorthand_data:
             ts = datetime(2020, 2, 1, 10, 10, int(sec),int(sec%1*10**6), tzinfo=tz_info)
