@@ -26,7 +26,7 @@ This system collects data from Modbus-based sensors.
 - Samples sensor readings continuously
 - Calculates fixed interval averages
 - Logs diagnostic information periodically
-- Writes data to timestamped CSV files
+- Writes data to timestamped CSV files every **1 minute**
 - Handles interruptions and Shut-downs gracefully without data loss (completes writes and empties caches)
 
 Two main threads orchestrate operation:
