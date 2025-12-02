@@ -27,7 +27,6 @@ registers:
       # 'count'  : number of consecutive registers to be used for field (this is for string field)
       # 'repeat' : number of consecutive fields of the same type in the registers (optional)
       # 'gap'    : the amount registers that are between a repeated data field sequence (i.e. data - gap - data - gap ...), (optional)
-
     corr_value:
       address: 0
       format: 'F32'
